@@ -8,11 +8,23 @@ program main
 
 	t1 = omp_get_wtime()
 
-	!$omp parallel do schedule(dynamic) reduction(+:result)
+	!$omp parallel
+
+	!$omp single
+
+	!$omp taskgroup task_reduction(+:result)
+
 	do i=1,dimensio
+		!$omp task in_reduction(+:result)
 		result = result + do_some_computation(i)
+		!$omp end task
 	end do
-	!$omp end parallel do
+
+	!$omp end taskgroup
+
+	!$omp end single
+
+	!$omp end parallel
 
 	t2 = omp_get_wtime()
 
