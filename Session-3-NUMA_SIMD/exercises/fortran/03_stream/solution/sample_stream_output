@@ -1,0 +1,46 @@
+myfile=  mydata.20240705_1406
+-DSTREAM_ARRAY_SIZE=200000000
+            
+            
+======================
+Run Set 1
+Running STREAM with first touch and OMP_PROC_BIND=close
+export OMP_PROC_BIND=close
+export OMP_PLACES=threads
+======================
+threads   Triad 
+1     14937.6
+2     16743.1
+4     30042.2
+8     28798.2
+16     28112.1
+32     29971.1
+48     44913.5
+64     59860.7
+96     89807.0
+128     120642.3
+160     152298.6
+192     184225.0
+224     217330.8
+256     251137.1
+                    
+======================
+Running STREAM with first touch and OMP_PROC_BIND=spread
+export OMP_PROC_BIND=spread
+export OMP_PLACES=threads
+======================
+threads   Triad 
+1     14924.3
+2     29867.8
+4     59770.6
+8     119474.6
+16     226949.2
+32     267753.6
+48     220163.8
+64     258299.8
+96     186742.0
+128     250677.5
+160     151224.4
+192     184140.7
+224     216410.4
+256     251664.5

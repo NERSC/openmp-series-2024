@@ -1,0 +1,239 @@
+1. The source codes
+
+"xthi_omp.c" is a pure OpenMP code to show thread affinity.
+"xthi_nested_omp.c" is a nested OpenMP code to show thread affinity.
+
+This README will show how to compile and run them on NERSC Perlmutter,
+the HPE/Cray Shasta system on the CPU compute nodes (AMD EPYC 7763).
+
+Users are encouraged to explore and understand the impact of different 
+runtime options to the process and thread affinity. For example:
+Choices for OMP_PROC_BIND are close, master, true, false.
+Choices for OMP_PLACES are: cores, sockets, and various ways to specify 
+explicit lists, etc.
+
+
+2. Compile 
+
+Compile on a Perlmutter login node using the compiler wrapper.
+The default is GNU compiler.
+% cc -fopenmp -o xthi_omp xthi_omp.c
+% cc -fopenmp -o xthi_nested_omp xthi_nested_omp.c
+
+
+3. Request a compute node via interactive batch:
+
+% salloc -N 1 -C cpu -q interactive -t 30:00
+...
+You will then get on a compute node.
+
+3.1 Check NUMA and hardware configuration
+
+Each AMD EPYC 7763 has 128 physical cores, 64 physical cores per socket. Each physical core has 2 hyperthreads. Hence 
+we say each Perlmutter CPU node has 128 physical cores * 2 hyperthreads = 256 logical cores. 
+Socket 0 has physical cores 0-63 (logical cores: 0-63, 128-191)
+Socket 1 has physical cores 64-127 (logical cores: 64-127, 192-255)
+
+
+nid004082% numactl -H
+available: 8 nodes (0-7)
+node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143
+node 0 size: 63800 MB
+node 0 free: 61443 MB
+node 1 cpus: 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159
+node 1 size: 64504 MB
+node 1 free: 60724 MB
+node 2 cpus: 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175
+node 2 size: 64504 MB
+node 2 free: 61572 MB
+node 3 cpus: 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191
+node 3 size: 64492 MB
+node 3 free: 61057 MB
+node 4 cpus: 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207
+node 4 size: 64504 MB
+node 4 free: 63674 MB
+node 5 cpus: 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 208 209 210 211 212 213 214 215 216 217 218 219 220 221 222 223
+node 5 size: 64504 MB
+node 5 free: 63659 MB
+node 6 cpus: 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239
+node 6 size: 64504 MB
+node 6 free: 61532 MB
+node 7 cpus: 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 240 241 242 243 244 245 246 247 248 249 250 251 252 253 254 255
+node 7 size: 64494 MB
+node 7 free: 61148 MB
+node distances:
+node   0   1   2   3   4   5   6   7 
+  0:  10  12  12  12  32  32  32  32 
+  1:  12  10  12  12  32  32  32  32 
+  2:  12  12  10  12  32  32  32  32 
+  3:  12  12  12  10  32  32  32  32 
+  4:  32  32  32  32  10  12  12  12 
+  5:  32  32  32  32  12  10  12  12 
+  6:  32  32  32  32  12  12  10  12 
+  7:  32  32  32  32  12  12  12  10 
+
+
+This result above means there are 8 NUMA domains on the compute node.  
+The cpus in each NUMA domain above are the logical cores numbering in each socket,
+And the small matrix shows the relative memory access cost between the 8 NUMA domains 0-7.
+Please see a diagram in Exercises_omp_2024.pdf on the Perlmutter CPU node and its sockets, NUMA domains,
+and logical cores numbering.
+
+The run results below report the core affinity of each thread, i.e., the binding of each OpenMP thread
+to the logical CPUs on the node, 
+It is recommended that when possible to spread the thread affinity and not to run multiple threads on each core 
+
+
+3.2 Run tests using "xthi_omp":
+
+nid00011% export OMP_NUM_THREADS=8
+
+No default binding:
+nid004082% ./xthi_omp |sort -k6n
+Hello from thread 0, on nid004082. (core affinity = 0-255)
+Hello from thread 1, on nid004082. (core affinity = 0-255)
+Hello from thread 2, on nid004082. (core affinity = 0-255)
+Hello from thread 3, on nid004082. (core affinity = 0-255)
+Hello from thread 4, on nid004082. (core affinity = 0-255)
+Hello from thread 5, on nid004082. (core affinity = 0-255)
+Hello from thread 6, on nid004082. (core affinity = 0-255)
+Hello from thread 7, on nid004082. (core affinity = 0-255)
+
+
+OMP_PROC_BIND being "spread" is useful. Let's also set OMP_PLACES=cores:
+(threads can migrate within the core):
+nid004082% export OMP_PROC_BIND=spread
+nid004082% export OMP_PLACES=cores  
+nid004082% ./xthi_omp |sort -k6n
+Hello from thread 0, on nid004082. (core affinity = 0,128)
+Hello from thread 1, on nid004082. (core affinity = 16,144)
+Hello from thread 2, on nid004082. (core affinity = 32,160)
+Hello from thread 3, on nid004082. (core affinity = 48,176)
+Hello from thread 4, on nid004082. (core affinity = 64,192)
+Hello from thread 5, on nid004082. (core affinity = 80,208)
+Hello from thread 6, on nid004082. (core affinity = 96,224)
+Hello from thread 7, on nid004082. (core affinity = 112,240)
+
+
+Now try to set the OMP_PLACES=threads:
+(each thread is bind to a logical core, one of the two hyperthreads of a single core)
+nid004082% export OMP_PLACES=threads
+nid004082% ./xthi_omp |sort -k6n
+Hello from thread 0, on nid004082. (core affinity = 0)
+Hello from thread 1, on nid004082. (core affinity = 16)
+Hello from thread 2, on nid004082. (core affinity = 32)
+Hello from thread 3, on nid004082. (core affinity = 48)
+Hello from thread 4, on nid004082. (core affinity = 64)
+Hello from thread 5, on nid004082. (core affinity = 80)
+Hello from thread 6, on nid004082. (core affinity = 96)
+Hello from thread 7, on nid004082. (core affinity = 112)
+
+Let's also try OMP_PLACES=sockets:
+(each thread can freely move within a socket, 4 threads will bind to first 
+socket and 4 threads will bind to the second socket).
+nid004082% export OMP_PLACES=sockets
+nid004082%./xthi_omp |sort -k6n
+Hello from thread 0, on nid004082. (core affinity = 0-63,128-191)
+Hello from thread 1, on nid004082. (core affinity = 0-63,128-191)
+Hello from thread 2, on nid004082. (core affinity = 0-63,128-191)
+Hello from thread 3, on nid004082. (core affinity = 0-63,128-191)
+Hello from thread 4, on nid004082. (core affinity = 64-127,192-255)
+Hello from thread 5, on nid004082. (core affinity = 64-127,192-255)
+Hello from thread 6, on nid004082. (core affinity = 64-127,192-255)
+Hello from thread 7, on nid004082. (core affinity = 64-127,192-255)
+
+If you give an explicit list of OMP_PLACES, it will bind to these places only, 
+such as:
+nid004082% export OMP_PLACES=0,1,2,3
+nid004082% ./xthi_omp |sort -k6n
+Hello from thread 0, on nid00011. (core affinity = 0)
+Hello from thread 1, on nid00011. (core affinity = 0)
+Hello from thread 2, on nid00011. (core affinity = 1)
+Hello from thread 3, on nid00011. (core affinity = 1)
+Hello from thread 4, on nid00011. (core affinity = 2)
+Hello from thread 5, on nid00011. (core affinity = 2)
+Hello from thread 6, on nid00011. (core affinity = 3)
+Hello from thread 7, on nid00011. (core affinity = 3)
+
+
+Now let's try OMP_PROC_BIND=close:
+nid004082% export OMP_PROC_BIND=close
+nid004082% export OMP_PLACES=threads
+nid004082% ./xthi_omp |sort -k6n
+Hello from thread 0, on nid004082. (core affinity = 0)
+Hello from thread 1, on nid004082. (core affinity = 128)
+Hello from thread 2, on nid004082. (core affinity = 1)
+Hello from thread 3, on nid004082. (core affinity = 129)
+Hello from thread 4, on nid004082. (core affinity = 2)
+Hello from thread 5, on nid004082. (core affinity = 130)
+Hello from thread 6, on nid004082. (core affinity = 3)
+Hello from thread 7, on nid004082. (core affinity = 131)
+
+nid004082% export OMP_PLACES=cores
+nid004082% ./xthi_omp |sort -k6n
+Hello from thread 0, on nid004082. (core affinity = 0,128)
+Hello from thread 1, on nid004082. (core affinity = 1,129)
+Hello from thread 2, on nid004082. (core affinity = 2,130)
+Hello from thread 3, on nid004082. (core affinity = 3,131)
+Hello from thread 4, on nid004082. (core affinity = 4,132)
+Hello from thread 5, on nid004082. (core affinity = 5,133)
+Hello from thread 6, on nid004082. (core affinity = 6,134)
+Hello from thread 7, on nid004082. (core affinity = 7,135)
+
+
+3.3 Run tests using "xthi_nested_omp":
+
+To run with 4 OpenMP threads in the outer parallel region, 
+and 3 OpenMP threads in the inner parallel region.
+
+nid004082% export OMP_NUM_THREADS=4,3
+
+OMP_PROC_BIND set to "spread,close" is recommended: outer layer "spread", 
+inner layer "close":
+
+nid004082% export OMP_PROC_BIND=spread,close
+nid004082% export OMP_PLACES=threads
+nid004082% ./xthi_nested_omp |sort -k4,6
+Hello from level 1: thread level 1= 0, on nid004082. (core affinity = 0)
+Hello from level 1: thread level 1= 1, on nid004082. (core affinity = 32)
+Hello from level 1: thread level 1= 2, on nid004082. (core affinity = 64)
+Hello from level 1: thread level 1= 3, on nid004082. (core affinity = 96)
+Hello from level 2: thread level 1=  0, thread level 2= 0, on nid004082. (core affinity = 0)
+Hello from level 2: thread level 1=  0, thread level 2= 1, on nid004082. (core affinity = 128)
+Hello from level 2: thread level 1=  0, thread level 2= 2, on nid004082. (core affinity = 1)
+Hello from level 2: thread level 1=  1, thread level 2= 0, on nid004082. (core affinity = 32)
+Hello from level 2: thread level 1=  1, thread level 2= 1, on nid004082. (core affinity = 160)
+Hello from level 2: thread level 1=  1, thread level 2= 2, on nid004082. (core affinity = 33)
+Hello from level 2: thread level 1=  2, thread level 2= 0, on nid004082. (core affinity = 64)
+Hello from level 2: thread level 1=  2, thread level 2= 1, on nid004082. (core affinity = 192)
+Hello from level 2: thread level 1=  2, thread level 2= 2, on nid004082. (core affinity = 65)
+Hello from level 2: thread level 1=  3, thread level 2= 0, on nid004082. (core affinity = 96)
+Hello from level 2: thread level 1=  3, thread level 2= 1, on nid004082. (core affinity = 224)
+Hello from level 2: thread level 1=  3, thread level 2= 2, on nid004082. (core affinity = 97)
+
+
+See non-optimal thread affinity with OMP_PROC_BIND=close,close below:
+nid004082% export OMP_PROC_BIND=close,close
+nid004082% export OMP_PLACES=threads
+nid004082% ./xthi_nested_omp |sort -k4,6
+Hello from level 1: thread level 1= 0, on nid004082. (core affinity = 0)
+Hello from level 1: thread level 1= 1, on nid004082. (core affinity = 128)
+Hello from level 1: thread level 1= 2, on nid004082. (core affinity = 1)
+Hello from level 1: thread level 1= 3, on nid004082. (core affinity = 129)
+Hello from level 2: thread level 1=  0, thread level 2= 0, on nid004082. (core affinity = 0)
+Hello from level 2: thread level 1=  0, thread level 2= 1, on nid004082. (core affinity = 128)
+Hello from level 2: thread level 1=  0, thread level 2= 2, on nid004082. (core affinity = 1)
+Hello from level 2: thread level 1=  1, thread level 2= 0, on nid004082. (core affinity = 128)
+Hello from level 2: thread level 1=  1, thread level 2= 1, on nid004082. (core affinity = 1)
+Hello from level 2: thread level 1=  1, thread level 2= 2, on nid004082. (core affinity = 129)
+Hello from level 2: thread level 1=  2, thread level 2= 0, on nid004082. (core affinity = 1)
+Hello from level 2: thread level 1=  2, thread level 2= 1, on nid004082. (core affinity = 129)
+Hello from level 2: thread level 1=  2, thread level 2= 2, on nid004082. (core affinity = 2)
+Hello from level 2: thread level 1=  3, thread level 2= 0, on nid004082. (core affinity = 129)
+Hello from level 2: thread level 1=  3, thread level 2= 1, on nid004082. (core affinity = 2)
+Hello from level 2: thread level 1=  3, thread level 2= 2, on nid004082. (core affinity = 130)
+
+nid004082% exit
+
+% exit
+

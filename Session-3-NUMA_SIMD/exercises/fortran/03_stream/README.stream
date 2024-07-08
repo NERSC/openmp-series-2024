@@ -1,0 +1,46 @@
+1. The source codes
+
+Note: There are runtime issues on Perlmutter with the Fortran codes for this exercises.
+Please use the C code below for exercises 
+
+"stream_nft.c" is the STREAM benchmark code without first touch
+(note: "stream_nft.f" is the STREAM benchmark code without first touch)
+
+This README shows how to compile and run on a NERSC Perlmutter HPE/Cray Shasta system 
+AMD EPYC 7763 CPU compute nodes.
+
+Each AMD EPYC 7763 has 2 sockets, each socket has 64 physical cores, 4 NUMA domains
+Each physical core has 2 hyperthreads. Hence we say each Perlmutter CPU node
+has 128 physical cores * 2 hyperthreads = 256 logical cores.
+Each CPU node has 512 GB of memory total.
+
+The provided stream.c code is parallelized with OpenMP, and uses first touch for initialization.
+
+2. Use the default GNU compiler and the compiler wrapper to build:
+% cc -fopenmp -o stream_nft stream_nft.c
+
+3. To run by submitting a batch script
+% sbatch run_stream_nft.sh
+
+here "run_streaim_nft.sh" is a sample batch script with various number of OMP_NUM_THREADS,
+OMP_PROC_BIND, and OMP_PLACES settings, and capture the TRIAD memory bandwidth result.
+
+4. Check "sample_stream_result" to see a sample batch job output from the above run.
+
+5. Modify stream_nft.c code so that it does first touch, and run the same experiements as above,
+Check the the TRIAD memory bandwidth results, and compare them with the no first touch results.
+Explain why doing first touch helps with STREAM memory bandwidth results.
+
+6. FYI: Issuase with Fortran codes:
+  "stream_nft.f" is the STREAM benchmark code without first touch
+
+  To compile:
+  % cc -c -fopenmp mysecond.c
+  % ftn -c -fopenmp stream_nft.c
+  % ftn -fopenmp stream_nft.o mysecond.o -o stream_nft
+
+  However, there are runtime segmentation fault with GNU or Intel compilers, and incorrect
+  bandwidth results (negative) with Nvidia compilers.
+
+
+~

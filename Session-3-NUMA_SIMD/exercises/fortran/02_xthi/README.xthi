@@ -1,0 +1,85 @@
+1. The source codes
+
+Note: There are no Fortran codes for this exercises. Please use the C codes below
+to understand the thread affinity as below.
+
+"xthi_omp.c" is a pure OpenMP code to show thread affinity.
+"xthi_nested_omp.c" is a nested OpenMP code to show thread affinity.
+
+This README will show how to compile and run them on NERSC Perlmutter,
+the HPE/Cray Shasta system on the CPU compute nodes (AMD EPYC 7763).
+
+Users are encouraged to explore and understand the impact of different 
+runtime options to the process and thread affinity. For example:
+Choices for OMP_PROC_BIND are close, master, true, false.
+Choices for OMP_PLACES are: cores, sockets, and various ways to specify 
+explicit lists, etc.
+
+
+2. Compile 
+
+Compile on a Perlmutter login node using the compiler wrapper.
+The default is GNU compiler.
+% cc -fopenmp -o xthi_omp xthi_omp.c
+% cc -fopenmp -o xthi_nested_omp xthi_nested_omp.c
+
+
+3. Request a compute node via interactive batch:
+
+% salloc -N 1 -C cpu -q interactive -t 30:00
+...
+You will then get on a compute node.
+
+3.1 Check NUMA and hardware configuration
+
+Each AMD EPYC 7763 has 128 physical cores, 64 physical cores per socket. Each physical core has 2 hyperthreads. Hence 
+we say each Perlmutter CPU node has 128 physical cores * 2 hyperthreads = 256 logical cores. 
+Socket 0 has physical cores 0-63 (logical cores: 0-63, 128-191)
+Socket 1 has physical cores 64-127 (logical cores: 64-127, 192-255)
+
+use "numactl -H" to get the hardware info, NUMA domains, and cpus in each NUMA domain.
+
+nid004082% numactl -H
+...
+
+This result above means there are 8 NUMA domains on the compute node, 
+And the cpus in each NUMA domain above are the logical cores numbering in each socket,
+Please see a diagram in Exercises_omp_2024.pdf on the Perlmutter CPU node and its sockets, NUMA domains, 
+and logical cores numbering. 
+
+
+The run results in the next stepbelow report the core affinity of each thread, i.e., the binding of each OpenMP thread
+to the logical CPUs on the node, 
+It is recommended that when possible to spread the thread affinity and not to run multiple threads on each core 
+
+
+3.2 Run tests using "xthi_omp" 
+
+Now try to run with differert number of threads, the different OMP_PROC_BIND and OMP_PLACES to see
+the affinity report and find out on the diagram which socket, which NUMA domain, and which physical core
+it is binded. 
+
+
+Sample run command witht the output ordered:
+nid004082% export OMP_NUM_THREADS=8
+nid004082% export OMP_PROC_BIND=spread
+nid004082% export OMP_PROC_BIND=cores
+nid004082% ./xthi_omp |sort -k4,6
+
+
+3.3 Run tests using "xthi_nested_omp"
+
+Now try to run with differert number of threads, the different OMP_PROC_BIND and OMP_PLACES to see
+the affinity report and find out on the diagram which socket, which NUMA domain, and which physical core
+it is binded. 
+
+Sample run commands witht the output ordered:
+nid004082% export OMP_NUM_THREADS=4,3
+nid004082% export OMP_PROC_BIND=spread,close
+nid004082% export OMP_PROC_BIND=cores
+nid004082% ./xthi_nested_omp |sort -k4,6
+
+nid004082% exit
+
+login12% 
+
